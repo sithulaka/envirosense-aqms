@@ -1,0 +1,13 @@
+CO2_inertia=0.99
+CO2_tries=100
+RatioMQ136CleanAir = 3.6
+RatioMQ4CleanAir = 4.4
+MQ136_H2S_A = 36.737
+MQ136_H2S_B = -3.536
+MQ136_SO2_A = 503.34
+MQ136_SO2_B = -3.774
+MQ4_CH4_A = 1012.7
+MQ4_CH4_B = -2.786
+ENS160temperature = 25.0
+ENS160humidity = 50.0
+warmupTime = 10000
