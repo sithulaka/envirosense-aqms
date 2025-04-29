@@ -33,13 +33,14 @@
 #define GPS_RXPin        16   // GPS RX
 #define GPS_TXPin        17   // GPS TX
 #define MICS_PRE_PIN 33  // Heater power control
+#define LED_PIN 13 // LED pin
 #define PIN_SPI_CS   5 // SD card
 #define ENS160_I2C_ADDRESS 0x53
 #define BAUDRATE 9600
 
 //Definitions MQ Sensors
 #define Board "ESP32"
-#define Voltage_Resolution 3.3
+#define Voltage_Resolution 5
 #define ADC_Bit_Resolution 12 // For ESP32
 
 //Define Variables
@@ -59,6 +60,7 @@ float MQ136_SO2_A = 503.34;
 float MQ136_SO2_B = -3.774;
 float MQ4_CH4_A = 1012.7;
 float MQ4_CH4_B = -2.786;
+bool ledState = 0;
 
 //data
 float lat = 0.0, lng = 0.0;
@@ -80,24 +82,31 @@ MQUnifiedsensor MQ136(Board, Voltage_Resolution, ADC_Bit_Resolution, MQ136_PIN, 
 // Function prototypes
 String readConfig(const String &name);
 
-#include <Arduino.h>
-#include "analog.cpp"
-
 void setup() {
 //Init serial port
     Serial.begin(BAUDRATE);
     SerialPM.begin(BAUDRATE, SERIAL_8N1, PM_RXPin, PM_TXPin); // SDS011 on UART1 (RX1=5, TX1=4)
     Serial2.begin(BAUDRATE, SERIAL_8N1, GPS_RXPin, GPS_TXPin); // GPS on UART2 (RX2=16, TX2=17)
 
+// Configure pin modes
+    pinMode(MG811_PIN, INPUT);        // CO2 sensor
+    pinMode(MQ136_PIN, INPUT);        // SO2 and H2S sensor
+    pinMode(MQ4_PIN, INPUT);          // CH4 sensor
+    pinMode(MICS_NOX_PIN, INPUT);     // NO2 sensor
+    pinMode(MICS_RED_PIN, INPUT);     // CO and hydrocarbons sensor
+    pinMode(MICS_PRE_PIN, OUTPUT);    // Heater power control
+    pinMode(PIN_SPI_CS, OUTPUT);      // SD card chip select
+    pinMode(LED_PIN, OUTPUT);
+
+// LED
+    digitalWrite(LED_PIN, HIGH);
+
 // SD card
-    if (!SD.begin(PIN_SPI_CS)) {
-        while (true){
-            Serial.println(F("SD Card: initialization failed!"));
-            delay(1000);
-        }
-    } else {
-        Serial.println(F("SD Card: initialization successful!"));
+    while (!SD.begin(PIN_SPI_CS)) {
+        Serial.println(F("SD Card: initialization failed!"));
+        delay(1000);
     }
+    Serial.println(F("SD Card: initialization successful!"));
 
 //read config - fixed variable shadowing by using global variables
     String warmupTimeStr = readConfig("warmupTime");
@@ -137,6 +146,13 @@ void setup() {
         co2Sensor.setInertia(CO2_inertia);
     }
 
+    String co2TriesStr = readConfig("CO2_tries");
+    Serial.println(co2TriesStr);
+    if (co2TriesStr.length() > 0) {
+        CO2_tries = co2TriesStr.toInt();
+        co2Sensor.setTries(CO2_tries);
+    }
+
     String MQ136_H2S_A_Str = readConfig("MQ136_H2S_A");
     Serial.println(MQ136_H2S_A_Str);
     if (MQ136_H2S_A_Str.length() > 0) {
@@ -172,14 +188,6 @@ void setup() {
     if (MQ4_CH4_B_Str.length() > 0) {
         MQ4_CH4_B = MQ4_CH4_B_Str.toFloat();
     }
-
-    String co2TriesStr = readConfig("CO2_tries");
-    Serial.println(co2TriesStr);
-    if (co2TriesStr.length() > 0) {
-        CO2_tries = co2TriesStr.toInt();
-        co2Sensor.setTries(CO2_tries);
-    }
-
 
 //SDS011 Setup
     SDS011.begin(&SerialPM); // Initialize SDS011 with SerialPM
@@ -221,23 +229,15 @@ void setup() {
     Warmup(warmupTime);
 
 //write data_title
-    myFile = SD.open("/data.txt", FILE_APPEND);
-    if (myFile) {
-        myFile.println("date , time , lat , lng , co2 , so2 , h2s , ch4 , no2 , c2h5oh , h2 , nh3 , co , tvoc , eco2 , pm25 , pm10");
-        myFile.close();
-    } else {
+    while (!(myFile = SD.open("/data.txt", FILE_APPEND))) {
         Serial.println(F("SD Card: error on opening file data.txt"));
-        while (true){
-            Serial.println(F("SD Card: error on opening file data.txt"));
-            delay(1000);
-        }
+        delay(1000);
     }
+    myFile.println("date , time , lat , lng , co2 , so2 , h2s , ch4 , no2 , c2h5oh , h2 , nh3 , co , tvoc , eco2 , pm25 , pm10");
+    myFile.close();
 
 //data_title
     Serial.println(F("date | time | lat | lng | co2 | so2 | h2s | ch4 | no2 | c2h5oh | h2 | nh3 | co | tvoc | eco2 | pm25 | pm10"));
-
-    Serial.begin(115200);
-    setupAnalogPins();
 }
 
 void loop() {
@@ -261,33 +261,12 @@ void loop() {
     static unsigned long lastCycleTime = 0;
     if (millis() - lastCycleTime >= cycleInterval) {
         lastCycleTime = millis();
+        ledState = !ledState;
         writeData();
         logData();
+        digitalWrite(LED_PIN, ledState);
     }
 
-    int value12, value14, value27;
-    
-    // Read all analog values
-    readAllAnalogValues(value12, value14, value27);
-    
-    // Print raw values
-    Serial.print("Raw Analog Values - Pin 12: ");
-    Serial.print(value12);
-    Serial.print(", Pin 14: ");
-    Serial.print(value14);
-    Serial.print(", Pin 27: ");
-    Serial.println(value27);
-    
-    // Print voltage values
-    Serial.print("Voltage Values - Pin 12: ");
-    Serial.print(convertToVoltage(value12));
-    Serial.print("V, Pin 14: ");
-    Serial.print(convertToVoltage(value14));
-    Serial.print("V, Pin 27: ");
-    Serial.print(convertToVoltage(value27));
-    Serial.println("V");
-    
-    delay(1000); // Read every second
 }
 
 void Warmup(unsigned long warmupTime) {
@@ -311,11 +290,11 @@ uint16_t readTVOC() {
 uint16_t readeECO2() {
     return (ENS160.getECO2());
 }   
-// #######################################################################################################
+
 float readCO2() {
     return (co2Sensor.read());
 }   
-// #######################################################################################################
+
 float readH2S(float A, float B) {
     MQ136.update(); // Update data, the arduino will read the voltage from the analog pin
     MQ136.setA(A); MQ136.setB(B); // Configure the equation to calculate H2S
@@ -333,7 +312,7 @@ float readCH4(float A, float B) {
     MQ4.setA(A); MQ4.setB(B); // Configure the equation to to calculate CH4
     return (MQ4.readSensor()); // CH4 Concentration
 }
-// #######################################################################################################
+
 float readNO2() {
     gasdata = MICS_4514.getNitrogenDioxide();
     return (gasdata);
@@ -358,6 +337,7 @@ float readCO() {
     gasdata = MICS_4514.getCarbonMonoxide();
     return (gasdata);
 }
+
 // Modified readGPSData() with robust validation
 void readGPSData() {
   static uint32_t lastValidFix = 0;
