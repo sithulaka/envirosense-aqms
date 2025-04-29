@@ -1,0 +1,122 @@
+SENSOR CONFIGURATION DOCUMENTATION
+
+1. CO2 Measurement Settings
+--------------------------
+CO2_inertia=0.99    // Smoothing factor for CO2 readings (0-1), higher means more smoothing
+CO2_tries=100       // Number of samples to take for CO2 measurement
+
+2. MQ Series Gas Sensor Calibration
+----------------------------------
+RatioMQ136CleanAir = 3.6  // RS/R0 ratio for MQ-136 in clean air
+RatioMQ4CleanAir = 4.4    // RS/R0 ratio for MQ-4 in clean air
+
+Gas concentration calculation formula:
+PPM = a * (RS/R0)^b
+where:
+- RS is the sensor resistance
+- R0 is the sensor resistance in clean air
+- a and b are gas-specific coefficients
+
+MQ-136 Coefficients:
+- H2S: PPM = 36.737 * (RS/R0)^-3.536
+- SO2: PPM = 503.34 * (RS/R0)^-3.774
+
+MQ-4 Coefficients:
+- CH4: PPM = 1012.7 * (RS/R0)^-2.786
+
+3. ENS160 Environmental Compensation
+----------------------------------
+ENS160temperature = 25.0  // Ambient temperature for compensation (°C)
+ENS160humidity = 50.0     // Relative humidity for compensation (%)
+
+ENS160 Internal Calculations:
+- Temperature conversion: temp = (ambientTemp + 273.15) * 64
+- Humidity conversion: rh = relativeHumidity * 512
+
+ENS160 Output Ranges:
+- AQI: 1-5 (Excellent, Good, Moderate, Poor, Unhealthy)
+- TVOC: 0-65000 ppb
+- eCO2: 400-65000 ppm
+  * Excellent: 400-600 ppm
+  * Good: 600-800 ppm
+  * Moderate: 800-1000 ppm
+  * Poor: 1000-1500 ppm
+  * Unhealthy: >1500 ppm
+
+4. General Settings
+------------------
+warmupTime = 10000  // Sensor warmup time in milliseconds
+
+Notes:
+- All MQ sensors require a warmup/preheat period for stable readings
+- RS/R0 ratios are used for calibration in clean air
+- Environmental compensation improves accuracy of gas measurements
+- Higher inertia values provide more stable readings but slower response
+
+DATA ENTRY RULES AND GUIDELINES
+------------------------------
+1. File Format Rules:
+   - Each configuration must be on a new line
+   - Use the format: PARAMETER_NAME=VALUE
+   - No spaces around the equals sign (=)
+   - No quotes around values
+   - No comments on the same line as values
+   - All values are case-sensitive
+
+2. Valid Value Ranges:
+   CO2_inertia: 0.0 to 1.0 (decimal)
+     - Higher values mean more smoothing
+     - Recommended: 0.95 to 0.99
+     
+   CO2_tries: 1 to 1000 (integer)
+     - Number of samples for averaging
+     - Recommended: 100 to 500
+
+   RatioMQ136CleanAir: 1.0 to 10.0 (decimal)
+     - Factory calibration value
+     - Default: 3.6
+
+   RatioMQ4CleanAir: 1.0 to 10.0 (decimal)
+     - Factory calibration value
+     - Default: 4.4
+
+   ENS160temperature: -40.0 to 85.0 (decimal)
+     - Environmental temperature in °C
+     - Normal range: 0.0 to 50.0
+
+   ENS160humidity: 0.0 to 100.0 (decimal)
+     - Relative humidity percentage
+     - Normal range: 20.0 to 80.0
+
+   warmupTime: 1000 to 300000 (integer)
+     - Sensor warmup time in milliseconds
+     - Minimum recommended: 10000 (10 seconds)
+
+3. Example Valid Entries:
+   CO2_inertia=0.99
+   CO2_tries=100
+   RatioMQ136CleanAir=3.6
+   RatioMQ4CleanAir=4.4
+   ENS160temperature=25.0
+   ENS160humidity=50.0
+   warmupTime=10000
+
+4. Common Mistakes to Avoid:
+   ❌ CO2_inertia = 0.99    (spaces around =)
+   ❌ CO2_tries=100.0       (integer value with decimal)
+   ❌ RatioMQ136CleanAir="3.6" (quotes around value)
+   ❌ ENS160temperature=25C  (unit symbol in value)
+   ❌ warmupTime=10000 #warmup (comment on same line)
+
+5. Updating Configuration:
+   - Save the file after making changes
+   - Restart the device for changes to take effect
+   - Keep a backup of working configurations
+   - Test new values in a controlled environment first
+
+6. Best Practices:
+   - Document any custom calibration values
+   - Regular calibration of gas sensors is recommended
+   - Monitor sensor performance after configuration changes
+   - Keep sensors in recommended temperature and humidity ranges
+   - Allow full warmup time after any configuration change
